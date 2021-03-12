@@ -8,56 +8,40 @@
 #include<sys/time.h>
 #include <math.h>
 #include<semaphore.h>
+#include "libmonitor.h"
 #define PERM (S_IRUSR|S_IWUSR)
 #define BUFSIZE 24
 
-int timespec2str(char buf[], struct timespec ts) {
-        const int bufsize = 31;
-        struct tm tm;
-        localtime_r(&ts.tv_sec, &tm);
-        strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S.", &tm);
-        sprintf(buf, "%s%09luZ", buf, ts.tv_nsec);
-        return 0;
-}
-
+//Function to produce random integers
 int randomint(int lower, int upper)
 {
 	int num = (rand() % (upper - lower + 1)) + lower;
 	return num;
 }
 
+//Function to produce random doubles
 double randomdouble(void)
 {
 	double dbl = (rand() % RAND_MAX) / (double)RAND_MAX;
 	return dbl;
 }
-
-// bin_adder adds two integers together and stored the result in place of the first integer
+  
+// Producer: produced random numbers and puts them in available slots in the shared buffer
 // Arguments passed:
-// 1 - name of data file (used to get key to shared memory)
-// 2 - number of numbers in shared memory
-// 3 - logical id of child
-// 4 - logical id of process (this will be 1 to s-1)
-// 5 - total number of processs "alive" at one time
+// 1 - name of data file 
+// 2 - philosopher number of process
 int main(int argc,char**argv)
 {
-	printf("\nHello from producer");
-	printf("\narg1:%s arg2:%s arg3: %s arg4: %s arg5: %s",argv[1],argv[2],argv[3],argv[4],argv[5]);
+	//printf("\nHello from producer");
 	key_t key;
-	int id=0;
+	int id=0,idstates=0;
 	double *buffer;
-	//int numOfNumbers=atoi(argv[2]);
 	char *logfile=argv[1];
-	int producerId=atoi(argv[2]);
-	//int numProcess=atoi(argv[4]);
+	int philId=atoi(argv[2]);
 	int i;
 	char timestr[31];
 	struct timespec tpchild;
 	FILE *log;
-	sem_t *semlock;
-	sem_t *semitems;
-	sem_t *semslots;
-//	int totalProcesses=atoi(argv[5]);
 
 	// Get clock time for log
 	if (clock_gettime(CLOCK_REALTIME,&tpchild)==-1)
@@ -66,9 +50,7 @@ int main(int argc,char**argv)
 		return 1;
 	}
 	//printf("\nChild time: %d childId: %d child: %d depth: %d\n",tpchild.tv_nsec,childId,child,depth);
-	//timespec2str(timestr, tpchild);
-	//printf("\nProducer time: %s",timestr);
-	
+
 	//Use current time as seed for random generator
 	srand(time(0));
 
@@ -92,97 +74,83 @@ int main(int argc,char**argv)
 		}
 		return 1;
 	}
+	/*for(i=0;i<BUFSIZE;i++)
+	{
+		printf("Buffer[%d]: %d\n",i,buffer[i]);
+	}*/
 
-	//for(i=0;i<BUFSIZE;i++)
-	//{
-	//	printf("Buffer[%d]: %d\n",i,buffer[i]);
-	//}
+	// Get access to philosopher states set up by the monitor
+	key_t keystates;
+	if((keystates=ftok(".",27)) == -1) {
+		perror("Failed to return key for states");
+		return 1;
+	}
+	if((idstates=shmget(keystates,sizeof(int)*N,PERM))==-1)
+	{
+		perror("Failed to create shared memory segment for states");
+		return 1;
+	}
+	if((state=shmat(idstates,NULL,0))==(void*)-1)
+	{
+		perror("Failed to attach shared memory segment for states");
+		if(shmctl(idstates,IPC_RMID,NULL)==-1)
+		{	
+			perror("Failed to remove shared memory segment for states");
+		}
+		return 1;
+	}
 
 	// Get semaphores
-	if((semlock = sem_open("/semlock",0))==SEM_FAILED)
+	if((chopstick = sem_open("/chopstick",0))==SEM_FAILED)
 	{
-		perror("Failed to open semlock semaphore in producer");
+		perror("Failed to open chopstick semaphore in producer");
 		return 1;
 	}
-	if((sem_getvalue(semlock,&i))==-1)
+	char philname[20];
+	for(i=0;i<N;i++)
 	{
-		perror("Failed to get value from semlock semaphore in producer");
-		return 1;
-	}
-	fprintf(stderr,"semlock: %d\n",i);
-	if((semitems = sem_open("/semitems",0))==SEM_FAILED)
+		sprintf(philname,"philosopher%d",i);
+		if((philosopher[i] = sem_open(philname,0))==SEM_FAILED)
+		{
+			perror("Failed to open philosopher semaphore in producer");
+			return 1;
+		}
+	}	
+	
+	while(1)
 	{
-		perror("Failed to open semitems semaphore in producer");
-		return 1;
+		//entry section
+		take_chopstick(philId);
+		//critical section
+		sleep(1);
+		if ((log=fopen(logfile,"a"))==NULL)
+		{
+			perror("Failed to open log file from producer");
+			return 1;
+		}
+		fprintf(stderr,"Entering critical section for producer/philosopher %d\n",philId);
+		fprintf(log,"Entering critical section for producer/philosopher %d\n",philId);
+		//if slot is available for use, else do nothing
+		if(buffer[(int)buffer[20]]==0.0)
+		{
+			buffer[(int)buffer[20]]=randomdouble();
+			timespec2str(timestr,tpchild);
+			fprintf(stderr,"Producer time:%s pid:%d Value:%f\n",timestr,philId,buffer[(int)buffer[20]]);
+			fprintf(log,"Producer time:%s pid:%d Value:%f\n",timestr,philId,buffer[(int)buffer[20]]);
+			buffer[20] = ((int)buffer[20]+1)%(BUFSIZE-4);
+		}
+		fprintf(stderr,"Exiting critical section for producer %d\n",philId);
+		fprintf(log,"Exiting critical section for producer %d\n",philId);
+		fclose(log);
+		//exit section
+		put_chopstick(philId);
+		sleep(randomint(1,5));
 	}
-	if((sem_getvalue(semitems,&i))==-1)
-	{
-		perror("Failed to get value from semitems semaphore in producer");
-		return 1;
-	}
-	fprintf(stderr,"semitems: %d\n",i);
-	if((semslots = sem_open("/semslots",0))==SEM_FAILED)
-	{
-		perror("Failed to open semslots semaphore in producer");
-		return 1;
-	}
-	if((sem_getvalue(semslots,&i))==-1)
-	{
-		perror("Failed to get value from semslots semaphore in producer");
-		return 1;
-	}
-	fprintf(stderr,"semslots: %d\n",i);
-
-	//entry section
-	while(sem_wait(semlock)==-1)
-	{
-		perror("Failed to lock semlock in producer");
-		return 1;
-	}
-	//critical section
-	sleep(1);
-	fprintf(stderr,"Entering critical section for producer %d\n",producerId);
-	while(sem_wait(semslots)==-1) {}
-	buffer[(int)buffer[20]]=randomdouble();
-	if ((log=fopen(logfile,"a"))==NULL)
-	{
-		perror("Failed to open log file from producer");
-		return 1;
-	}
-	timespec2str(timestr,tpchild);
-	//fprintf(log,"\n\ntime:%d pid:%d index:%d depth:%d Value:%d\n",tpchild.tv_nsec,numProcess,first,depth,sharedArea[first]);
-	fprintf(stderr,"\n\nProducer time:%s pid:%d Value:%f",timestr,producerId,buffer[(int)buffer[20]]);
-	fclose(log);
-	buffer[20] = ((int)buffer[20]+1)%(BUFSIZE-4);
-	if(sem_post(semitems)==-1) 
-	{
-		perror("Failed to post for semitems");
-		return 1;
-	}
-	fprintf(stderr,"\nExiting critical section for producer %d\n",producerId);
-	//exit section
-	if(sem_post(semlock)==-1)
-	{
-		perror("Failed to unlock semlock");
-		return 1;
-	}
-	sleep(randomint(1,5));	
-
-	if((sem_close(semlock))==-1)
-	{
-		perror("Failed to close semlock semaphore in producer");
-		return 1;
-	}
-	if((sem_close(semitems))==-1)
+	
+	if((sem_close(chopstick))==-1)
 	{
 		perror("Failed to close semitems semaphore in producer");
 		return 1;
 	}
-	if((sem_close(semslots))==-1)
-	{
-		perror("Failed to close semslots semaphore in producer");
-		return 1;
-	}
-
 	return 0;
 }

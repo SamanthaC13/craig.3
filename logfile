@@ -1,0 +1,111 @@
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.566196
+Exiting critical section for producer 0
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.432800
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.566196
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.887773
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.432800
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.890663
+Exiting critical section for producer 0
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.766460
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.887773
+Exiting critical section for consumer/philosopher 1
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.890663
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.430598
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.766460
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.664882
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.430598
+Exiting critical section for consumer/philosopher 1
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.664882
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.639822
+Exiting critical section for producer 0
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.400114
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.639822
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.993477
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.400114
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.089817
+Exiting critical section for producer 0
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.722830
+Exiting critical section for producer 0
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.934766
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.993477
+Exiting critical section for consumer/philosopher 1
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.089817
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.843326
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.722830
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.303423
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.934766
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.526052
+Exiting critical section for producer 0
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.948914
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.843326
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.096698
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.303423
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.622646
+Exiting critical section for producer 0
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.380973
+Exiting critical section for producer 0
+Entering critical section for consumer/philosopher 1
+Consumer time:2021-03-12 13:47:51.679774617Z pid:1 Value:0.526052
+Exiting critical section for consumer/philosopher 1
+Entering critical section for producer/philosopher 0
+Producer time:2021-03-12 13:47:50.679378067Z pid:0 Value:0.320122
+Exiting critical section for producer 0

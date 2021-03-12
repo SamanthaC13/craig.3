@@ -20,18 +20,28 @@
 
 // global variables
 int id=0;
+int idstates=0;
 double *buffer;
-sem_t *semlock;
-sem_t *semitems;
-sem_t *semslots;
 pid_t childpid;
+pid_t pids[20];
+FILE *logfile;
 
 // This function cleans up shared memory and children
 void cleanup()
 {
+	int i;
+	for(i=0;i<BUFSIZE;i++)
+	{
+		fprintf(stderr,"buffer[%d]: %f\n",i,buffer[i]);
+	}
+	printf("Estimated average value of sin(x): %f\n",buffer[22]/buffer[23]);
+	fprintf(logfile,"Estimated average value of sin(x): %f\n",buffer[22]/buffer[23]);
 	char timestr[31];
 	struct timespec tpend;
 	printf("Clean up started\n");
+	fprintf(logfile,"Clean up started\n");
+	
+	//Clean up shared memory
 	if(shmdt(buffer)==-1)
 	{
 		perror("Failed to deatach from shared memory");
@@ -42,38 +52,58 @@ void cleanup()
 		perror("Failed to remove shared memory");
 		exit(1);
 	}
-	if((sem_close(semlock))==-1)
+	if(shmdt(state)==-1)
 	{
-		perror("Failed to close semlock semaphore");
+		perror("Failed to deatach from shared memory for states");
 		exit(1);
 	}
-	if((sem_unlink("/semlock"))==-1)
+	if(shmctl(idstates,IPC_RMID,NULL)==-1)
 	{
-		perror("Failed to unlink semlock semaphore");
+		perror("Failed to remove shared memory for states");
 		exit(1);
 	}
-	if((sem_close(semitems))==-1)
+	
+	//Clean up semaphores
+	if((sem_close(chopstick))==-1)
 	{
-		perror("Failed to close semitems semaphore");
+		perror("Failed to close chopstick semaphore");
 		exit(1);
 	}
-	if((sem_unlink("/semitems"))==-1)
+	if((sem_unlink("/chopstick"))==-1)
 	{
-		perror("Failed to unlink semitems semaphore");
+		perror("Failed to unlink chopstick semaphore");
 		exit(1);
 	}
-	if((sem_close(semslots))==-1)
+	char philname[20];
+	for(i=0;i<N;i++)
 	{
-		perror("Failed to close semslots semaphore");
-		exit(1);
+		sprintf(philname,"philosopher%d",i);
+		if((sem_close(philosopher[i]))==-1)
+		{
+			perror("Failed to close philosopher semaphore");
+			exit(1);
+		}
+		if((sem_unlink(philname))==-1)
+		{
+			perror("Failed to unlink philosopher semaphore");
+			exit(1);
+		}
 	}
-	if((sem_unlink("/semslots"))==-1)
+	
+	// kill the child processes
+	for(i=0;i<20;i++)
 	{
-		perror("Failed to unlink semslots semaphore");
-		exit(1);
+		//printf("pids[%d]: %d\n",i,pids[i]);
+		if(pids[i]!=0)
+		{
+			printf("killing child: %d\n",pids[i]);
+			fprintf(logfile,"killing child: %d\n",pids[i]);
+			kill(pids[i],SIGTERM);
+		}
 	}
-	//kill(childpid,SIGTERM);
 	printf("Clean up complete\n");
+	fprintf(logfile,"Clean up complete\n");
+	
 	if (clock_gettime(CLOCK_REALTIME,&tpend)==-1)
 	{
 		perror("Failed to get ending time");
@@ -81,7 +111,10 @@ void cleanup()
 	}
 	timespec2str(timestr,tpend);
 	printf("\nEnd of program: %s\n",timestr);
+	fprintf(logfile,"\nEnd of program: %s\n",timestr);
+	fclose(logfile);
 }
+	
 
 // This function is performed when Ctrl-C is pressed
 static void catchctrlcinterrupt(int signo)
@@ -89,6 +122,7 @@ static void catchctrlcinterrupt(int signo)
 	char ctrlcmsg[]="Ctrl-C interruption\n";
 	int msglen = sizeof(ctrlcmsg);
 	write(STDERR_FILENO,ctrlcmsg,msglen);
+	write(fileno(logfile),ctrlcmsg,msglen);
 	cleanup();
 	exit(1);
 }
@@ -96,9 +130,10 @@ static void catchctrlcinterrupt(int signo)
 // This function is performed when the timer expires
 static void catchtimerinterrupt(int signo)
 {
-	char timermsg[] = "Timer interrupt after specified number of second\n";
+	char timermsg[] = "Timer interrupt after specified number of seconds\n";
 	int msglen = sizeof(timermsg);
 	write(STDERR_FILENO,timermsg,msglen);
+	write(fileno(logfile),timermsg,msglen);
 	cleanup();
 	exit(1);
 }
@@ -121,11 +156,16 @@ int main (int argc,char* argv[])
 	int n=6;
 	int t=100;
 	int num=0;
-	int numOfNumbers=0;
-	FILE *fptr;
 	struct timespec tpstart;
 	char timestr[31];
 
+	//Open log file for main program
+	if ((logfile=fopen("outfile","a"))==NULL)
+	{
+		perror("Failed to open log file for monitor");
+		return 1;
+	}
+	
 	// Get start time for program
 	if (clock_gettime(CLOCK_REALTIME,&tpstart)==-1)
 	{
@@ -134,8 +174,16 @@ int main (int argc,char* argv[])
 	}
 	timespec2str(timestr, tpstart);
 	fprintf(stderr,"Beginning of program: %s\n",timestr);
+	fprintf(logfile,"Beginning of program: %s\n",timestr);
 	
-	// Get program arguments 
+	// Initialize all pids to 0
+	int i;
+	for(i=0;i<20;i++)
+	{
+		pids[i]=0;
+	}	
+
+// Get program arguments 
 	while((option=getopt(argc,argv, "ho:p:c:t:"))!=-1)
 	{	
 		switch(option)
@@ -178,18 +226,13 @@ int main (int argc,char* argv[])
 	// Check if number of consumers is greater than number of producers
 	if(m>=n)
 	{
-		perror("Number of producers must be greater than number of consumers");
+		perror("Number of consumers must be greater than number of producers");
 		exit(EXIT_FAILURE);
 	}
-	// Set a hard limit of 20 processes even if more is entered
-/*	if(s>20)
-	{
-		s=20;
-		fprintf(stderr,"Number of processes is being limited to 20");
-	}
-*/
+
 	fprintf(stderr,"Usage: [-o %s] [-p %d] [-c %d] [-t %d] \n",logfilename,m,n,t);
-/*	
+	fprintf(logfile,"Usage: [-o %s] [-p %d] [-c %d] [-t %d] \n",logfilename,m,n,t);
+	
 	// Set up the timer
 	if(setuptimer(t)==-1)
 	{
@@ -199,29 +242,9 @@ int main (int argc,char* argv[])
 	// Set up timer interrupt
 	signal(SIGALRM, catchtimerinterrupt);
 	// Set up Ctrl-C interrupt
-	signal(SIGINT, catchctrlcinterrupt);
+	signal(SIGINT, catchctrlcinterrupt);	
 
-	// Open input file of numbers
-	if((fptr=fopen(argv[optind],"r"))==NULL){
-		perror("Failed to open file");
-		return 1;
-	}
-	// Read input file to see how many numbers are in file
-	// This number is assumed to be a power of 2
-	while((fscanf(fptr,"%d",&num))==1)
-	{
-		numOfNumbers++;
-		fprintf(stderr,"%d\n",num);
-	}
-	// Chick to see if any numbers are in file
-	if(numOfNumbers==0)
-	{
-		perror("File has no contents");
-		return 1;
-	}
-	fclose(fptr);
-*/	
-	// Get shared memory the size of the buffer
+	// Get shared memory the size of the buffer and initialize memory to zero
 	key_t key;
 	if((key=ftok(".",13)) == -1) {
 		perror("Failed to return key");
@@ -241,178 +264,124 @@ int main (int argc,char* argv[])
 		}
 		return 1;
 	}
-	int i;
 	for(i=0;i<BUFSIZE;i++)
 	{
 		buffer[i]=0;
 	}
-	for(i=0;i<BUFSIZE;i++)
+	/*for(i=0;i<BUFSIZE;i++)
 	{
 		fprintf(stderr,"buffer[%d]: %f\n",i,buffer[i]);
-	}
+	}*/
 
+	// Get shared memory for the philosopher states and initialize to THINKING
+	key_t keystates;
+	if((keystates=ftok(".",27)) == -1) {
+		perror("Failed to return key for states");
+		return 1;
+	}
+	if((idstates=shmget(keystates,sizeof(int)*N,PERM|IPC_CREAT))==-1)
+	{
+		perror("Failed to create shared memory segment for states");
+		return 1;
+	}
+	if((state=shmat(idstates,NULL,0))==(void*)-1)
+	{
+		perror("Failed to attach shared memory segment for states");
+		if(shmctl(idstates,IPC_RMID,NULL)==-1)
+		{	
+			perror("Failed to remove shared memory segment for states");
+		}
+		return 1;
+	}
+	for(i=0;i<N;i++)
+	{
+		state[i]=THINKING;
+	}
+/*	for(i=0;i<N;i++)
+	{
+		fprintf(stderr,"Philosopher state[%d]: %f\n",i,state[i]);
+	}*/
+	
 	// Get semaphores
-	if((semlock = sem_open("/semlock",SEM_FLAGS,SEM_PERMS,1))==SEM_FAILED)
+	if((chopstick = sem_open("/chopstick",SEM_FLAGS,SEM_PERMS,1))==SEM_FAILED)
 	{
-		sem_unlink("/semlock");
-		if((semlock = sem_open("/semlock",SEM_FLAGS,SEM_PERMS,1))==SEM_FAILED)
+		sem_unlink("/chopstick");
+		if((chopstick = sem_open("/chopstick",SEM_FLAGS,SEM_PERMS,1))==SEM_FAILED)
 		{
-			perror("Failed to create semlock semaphore");
+			perror("Failed to create chopstick semaphore");
 			return 1;
 		}
 	}
-	if((sem_getvalue(semlock,&i))==-1)
+	char philname[20];
+	for(i=0;i<N;i++)
 	{
-		perror("Failed to get value from semlock semaphore");
-		return 1;
-	}
-	fprintf(stderr,"semlock: %d\n",i);
-	if((semitems = sem_open("/semitems",SEM_FLAGS,SEM_PERMS,0))==SEM_FAILED)
-	{
-		sem_unlink("/semitems");
-		if((semitems = sem_open("/semitems",SEM_FLAGS,SEM_PERMS,0))==SEM_FAILED)
+		sprintf(philname,"philosopher%d",i);
+		if((philosopher[i] = sem_open(philname,SEM_FLAGS,SEM_PERMS,0))==SEM_FAILED)
 		{
-			perror("Failed to create or open semitems semaphore");
-			return 1;
+			sem_unlink(philname);
+			if((philosopher[i] = sem_open(philname,SEM_FLAGS,SEM_PERMS,0))==SEM_FAILED)
+			{
+				perror("Failed to create or open philosopher semaphore");
+				return 1;
+			}
 		}
-	}
-	if((sem_getvalue(semitems,&i))==-1)
-	{
-		perror("Failed to get value from semitems semaphore");
-		return 1;
-	}
-	fprintf(stderr,"semitems: %d\n",i);
-	if((semslots = sem_open("/semslots",SEM_FLAGS,SEM_PERMS,BUFSIZE-4))==SEM_FAILED)
-	{
-		sem_unlink("/semslots");
-		if((semslots = sem_open("/semslots",SEM_FLAGS,SEM_PERMS,BUFSIZE-4))==SEM_FAILED)
-		{
-			perror("Failed to create or open semslots semaphore");
-			return 1;
-		}
-	}
-	if((sem_getvalue(semslots,&i))==-1)
-	{
-		perror("Failed to get value from semslots semaphore");
-		return 1;
-	}
-	fprintf(stderr,"semslots: %d\n",i);
-
-
-
-/*
-	// Open file to read numbers
-	if((fptr=fopen(argv[optind],"r"))==NULL){
-		perror("Failed to open file");
-		return 1;
-	}
-	// Read numbers are store them in shared memory
-	int i=0;
-	while((fscanf(fptr,"%d",&num))==1)
-	{
-		sharedArea[i]=num;
-		i++;	
-	}
-	fclose(fptr);
-*/	
+	}	
+	
 	// Logic to create children to perform binary tree addition
-	char numString[20];
-	char iString[20];
-	char pString[20];
-	char sString[20];
-	sprintf(numString,"%d",numOfNumbers);
+	char philString[20];
 	int totalProducers=1;
 	int totalConsumers=1;
 	int numProducer=0;
 	int numConsumer=0;
-
-
-	// Loop for the number of children needed to perform task
-	// This loops from the number needed down to 0
-/*	while (i>0)
-	{
-		// Loop until maximum child processes are created or
-		// all child processes have been created
-		while (numProcess<totalProcesses && i>0)
-		{
-*/			// Increment counter for number of processes
+	int philNumber=0;
+	
 			numProducer++;
+			philNumber++;
 			printf("Incrementing producer count: %d\n",numProducer);
 			childpid=fork();
 			// Check if child process was not created
 			if(childpid==-1)
 			{
-				perror("Failed to fork");
-				//break;
+				perror("Failed to fork a producer");
 				return 1;
 			}
-			// Perform child logic
 			if(childpid==0)
 			{
-				// Execute bin_adder process passing in needed arguments
 				// Arguments have to be passed as strings
-				sprintf(iString,"%d",i);
-				sprintf(pString,"%d",numProducer);
-				sprintf(sString,"%d",totalProducers);
-				//execl("./bin_adder","bin_adder",argv[optind],numString,iString,pString,sString,NULL);
-				execl("./producer","producer",logfilename,pString);
+				//pids[0]=childpid;
+				sprintf(philString,"%d",philNumber-1);
+				execl("./producer","producer",logfilename,philString);
 				perror("Failed to exec producer");
 				return 1;
 			}
-			// Perform parent logic
-			i--;
+			pids[0]=childpid;
 			sleep(1);
 			numConsumer++;
+			philNumber++;
 			printf("Incrementing consumer count: %d\n",numConsumer);
 			childpid=fork();
 			if(childpid==-1)
 			{	
-				perror("Failed to fork");
+				perror("Failed to fork a consumer");
 				return 1;
 			}
 			if(childpid==0)
 			{
-				sprintf(pString,"%d",numConsumer);
-				execl("./consumer","consumer",logfilename,pString);
+				//pids[1]=childpid;
+				sprintf(philString,"%d",philNumber-1);
+				execl("./consumer","consumer",logfilename,philString);
 				perror("Failed to exec consumer");
 				return 1;
 			}
-//		}
-		// Wait for child process to finish
+			pids[1]=childpid;
+
 		while (wait(NULL)>0)
 		{
 			// When each child is finished decrement process counter
 			//numProcess--;
 			//printf("Decrementing process count: %d\n",numProcess);
 		}
-//	}
-//	// Parent process is complete and answer is found
-//	printf("Final answer: %d\n",sharedArea[0]);
-//	
-	for(i=0;i<BUFSIZE;i++)
-	{
-		fprintf(stderr,"buffer[%d]: %f\n",i,buffer[i]);
-	}
-	if((sem_getvalue(semlock,&i))==-1)
-	{
-		perror("Failed to get value from semlock semaphore");
-		return 1;
-	}
-	fprintf(stderr,"semlock: %d\n",i);
-	if((sem_getvalue(semitems,&i))==-1)
-	{
-		perror("Failed to get value from semitems semaphore");
-		return 1;
-	}
-	fprintf(stderr,"semitems: %d\n",i);
-	if((sem_getvalue(semslots,&i))==-1)
-	{
-		perror("Failed to get value from semslots semaphore");
-		return 1;
-	}
-	fprintf(stderr,"semslots: %d\n",i);
-
-
+	
 	cleanup();
 
 	return 0;
