@@ -147,7 +147,13 @@ static int setuptimer(int t)
 	value.it_value = value.it_interval;
 	return (setitimer(ITIMER_REAL,&value,NULL));
 }
-
+void help()
+{
+	printf("This program uses the dining philosopher's problem and monitors to solve the Producer/Consumer problem. You can specify with the option -o the logfile name you want this program to write to.");
+	printf("With the option -p you can decide how many producers hare created in the program Similarly with option -c you can decide how many consumers are created in the program. However there must be more consumers than producers");
+	printf("Also the limit of producers plus consumers is 20. Another option you have is to set a time limit in seconds on how the this program can run using the option -t");
+	exit(0);
+}
 int main (int argc,char* argv[])
 {
 	int option=0;
@@ -189,7 +195,7 @@ int main (int argc,char* argv[])
 		switch(option)
 		{
 			case'h':
-				printf("help");
+				help();
 				break;
 			case'o':
 				logfilename=optarg;
@@ -268,11 +274,6 @@ int main (int argc,char* argv[])
 	{
 		buffer[i]=0;
 	}
-	/*for(i=0;i<BUFSIZE;i++)
-	{
-		fprintf(stderr,"buffer[%d]: %f\n",i,buffer[i]);
-	}*/
-
 	// Get shared memory for the philosopher states and initialize to THINKING
 	key_t keystates;
 	if((keystates=ftok(".",27)) == -1) {
@@ -297,21 +298,18 @@ int main (int argc,char* argv[])
 	{
 		state[i]=THINKING;
 	}
-/*	for(i=0;i<N;i++)
-	{
-		fprintf(stderr,"Philosopher state[%d]: %f\n",i,state[i]);
-	}*/
-	
-	// Get semaphores
+	// Create  chopstick semaphore
 	if((chopstick = sem_open("/chopstick",SEM_FLAGS,SEM_PERMS,1))==SEM_FAILED)
 	{
 		sem_unlink("/chopstick");
+	
 		if((chopstick = sem_open("/chopstick",SEM_FLAGS,SEM_PERMS,1))==SEM_FAILED)
 		{
 			perror("Failed to create chopstick semaphore");
 			return 1;
-		}
+	// Get semaphore
 	}
+	//creating the array of semaphores the philosophers
 	char philname[20];
 	for(i=0;i<N;i++)
 	{
@@ -327,14 +325,17 @@ int main (int argc,char* argv[])
 		}
 	}	
 	
-	// Logic to create children to perform binary tree addition
+	// Logic to span the children 
 	char philString[20];
-	int totalProducers=1;
-	int totalConsumers=1;
 	int numProducer=0;
 	int numConsumer=0;
 	int philNumber=0;
-	
+
+	for(i=0;i<20;i++)
+	{
+		//where the producers are spawned
+		if(numProducer<m)
+		{
 			numProducer++;
 			philNumber++;
 			printf("Incrementing producer count: %d\n",numProducer);
@@ -348,14 +349,17 @@ int main (int argc,char* argv[])
 			if(childpid==0)
 			{
 				// Arguments have to be passed as strings
-				//pids[0]=childpid;
 				sprintf(philString,"%d",philNumber-1);
 				execl("./producer","producer",logfilename,philString);
 				perror("Failed to exec producer");
 				return 1;
 			}
-			pids[0]=childpid;
+			pids[philNumber-1]=childpid;
 			sleep(1);
+		}
+		//wher the consumers are spawned
+		if(numConsumer<n)
+		{
 			numConsumer++;
 			philNumber++;
 			printf("Incrementing consumer count: %d\n",numConsumer);
@@ -367,20 +371,16 @@ int main (int argc,char* argv[])
 			}
 			if(childpid==0)
 			{
-				//pids[1]=childpid;
 				sprintf(philString,"%d",philNumber-1);
 				execl("./consumer","consumer",logfilename,philString);
 				perror("Failed to exec consumer");
 				return 1;
 			}
-			pids[1]=childpid;
-
-		while (wait(NULL)>0)
-		{
-			// When each child is finished decrement process counter
-			//numProcess--;
-			//printf("Decrementing process count: %d\n",numProcess);
+			pids[philNumber-1]=childpid;
 		}
+	}
+	//parent waiting to the childrent to finish
+	while (wait(NULL)>0){}
 	
 	cleanup();
 
